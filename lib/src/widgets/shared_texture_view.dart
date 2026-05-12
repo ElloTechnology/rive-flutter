@@ -31,6 +31,9 @@ class _SharedTextureViewState extends State<SharedTextureView> {
   @override
   void initState() {
     super.initState();
+    debugPrint(
+      'SharedTextureView initState state=${identityHashCode(this)} artboard=${widget.artboard.name}',
+    );
     widget.painter.artboardChanged(widget.artboard);
   }
 
@@ -40,6 +43,14 @@ class _SharedTextureViewState extends State<SharedTextureView> {
     if (oldWidget.artboard != widget.artboard) {
       widget.painter.artboardChanged(widget.artboard);
     }
+  }
+
+  @override
+  void dispose() {
+    debugPrint(
+      'SharedTextureView dispose state=${identityHashCode(this)} artboard=${widget.artboard.name}',
+    );
+    super.dispose();
   }
 
   @override
@@ -170,6 +181,9 @@ class SharedTextureViewRenderObject extends RiveNativeRenderBox
 
   @override
   void dispose() {
+    debugPrint(
+      'SharedTextureViewRenderObject dispose renderObject=${identityHashCode(this)}',
+    );
     _shared.removePainter(this);
     _shared.texture.onTextureChanged = null;
     super.dispose();

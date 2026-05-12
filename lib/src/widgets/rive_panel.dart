@@ -124,10 +124,12 @@ class _RivePanelState extends State<RivePanel> {
   void initState() {
     super.initState();
     _renderTexture = RiveNative.instance.makeRenderTexture();
+    debugPrint('RivePanel initState panel=${identityHashCode(this)}');
   }
 
   @override
   void dispose() {
+    debugPrint('RivePanel dispose panel=${identityHashCode(this)}');
     _renderTexture?.dispose();
     super.dispose();
   }
