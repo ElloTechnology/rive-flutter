@@ -52,7 +52,7 @@ class BackgroundRiveWidgetController {
   void watchProperty(String name) {}
   void unwatchProperty(String name) {}
   List<SnapshotEntry> acquireSnapshot({int maxProperties = 32}) => const [];
-  List<RiveThreadedEvent> pollEvents({int maxEvents = 32}) => const [];
+  List<RiveThreadedEvent> pollEvents({int maxEvents = 128}) => const [];
   void pointerDown(double x, double y, {int pointerId = 0}) {}
   void pointerMove(double x, double y, {int pointerId = 0}) {}
   void pointerUp(double x, double y, {int pointerId = 0}) {}
