@@ -11,6 +11,8 @@ import 'package:rive_native/src/ffi/rive_ffi.dart'
 import 'package:rive_native/src/ffi/rive_threaded_ffi.dart';
 import 'package:rive_native/rive_native.dart';
 
+import 'event_drainer.dart';
+
 /// A controller for Rive content that advances and renders on a dedicated C++
 /// background thread.
 ///
@@ -213,8 +215,20 @@ class BackgroundRiveWidgetController {
   // ---------------------------------------------------------------------------
 
   /// Drains pending Rive state-machine reported events.
-  List<RiveThreadedEvent> pollEvents({int maxEvents = 32}) =>
-      _bindings?.pollEvents(maxEvents: maxEvents) ?? const [];
+  ///
+  /// Calls `RiveThreadedBindings.pollEvents` in a loop with [maxEvents] as
+  /// the per-call cap, accumulating until a non-full batch arrives. The cap
+  /// matches the C++-side `riveThreadedPollEvents` truncation, so any depth
+  /// queued between Flutter post-frame ticks surfaces in full instead of
+  /// silently dropping past the cap.
+  List<RiveThreadedEvent> pollEvents({int maxEvents = kDefaultPollCap}) {
+    final bindings = _bindings;
+    if (bindings == null) return const [];
+    return drainPolls<RiveThreadedEvent>(
+      poll: (n) => bindings.pollEvents(maxEvents: n),
+      maxEvents: maxEvents,
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // Pointer events
