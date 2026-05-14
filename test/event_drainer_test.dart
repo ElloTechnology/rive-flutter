@@ -88,5 +88,37 @@ void main() {
       expect(seenCap, kDefaultPollCap);
       expect(kDefaultPollCap, 128);
     });
+
+    test('honours maxIterations and fires onCapHit', () {
+      // poll always returns a full batch of `n` → drainer would loop forever
+      // without the iteration cap. Assert the cap stops it and the callback
+      // surfaces the saturation.
+      var pollCount = 0;
+      var capHitWith = -1;
+      drainPolls<int>(
+        poll: (n) {
+          pollCount++;
+          return List<int>.generate(n, (i) => i);
+        },
+        maxEvents: 4,
+        maxIterations: 3,
+        onCapHit: (n) => capHitWith = n,
+      );
+      expect(pollCount, 3);
+      expect(capHitWith, 4);
+    });
+
+    test('does not fire onCapHit if drain completes within maxIterations', () {
+      var capHits = 0;
+      drainPolls<int>(
+        poll: (n) {
+          // returns less-than-cap on first call → loop exits naturally
+          return const [1, 2, 3];
+        },
+        maxEvents: 128,
+        onCapHit: (_) => capHits++,
+      );
+      expect(capHits, 0);
+    });
   });
 }

@@ -78,6 +78,13 @@ class BackgroundRiveWidgetController {
 
   bool get isInitialized => _bindings != null;
 
+  /// True after the native render callback has marked a fatal EGL/GL error
+  /// (e.g. EGL_CONTEXT_LOST, or any of clear/makeRenderer/flush returning
+  /// false). Once set the bg worker has permanently stopped drawing; the
+  /// caller should tear down this controller and fall back to the synchronous
+  /// path. The flag is one-way and survives until [dispose].
+  bool get hasFatalError => _bindings?.hasFatalError ?? false;
+
   /// The [RenderTexture] whose [textureId] [BackgroundRiveView] composites.
   ///
   /// Valid only after [initialize] returns `true`.
@@ -312,6 +319,22 @@ class BackgroundRiveWidgetController {
   List<SnapshotEntry> acquireSnapshot({int maxProperties = 32}) =>
       _bindings?.acquireSnapshot(maxProperties: maxProperties) ?? const [];
 
+  /// Acquires the latest snapshot AND drains queued Rive events in a single
+  /// FFI round-trip under one native mutex acquisition. The returned snapshot
+  /// and event batch always come from the same bg cycle (events that announce
+  /// a transition land in the same call as the snapshot reflecting it).
+  ///
+  /// Returns an empty frame if the controller is not initialised.
+  ThreadedFrame acquireFrame({
+    int maxProperties = 64,
+    int maxEvents = kDefaultPollCap,
+  }) =>
+      _bindings?.acquireFrame(
+        maxProperties: maxProperties,
+        maxEvents: maxEvents,
+      ) ??
+      const ThreadedFrame(properties: [], events: []);
+
   // ---------------------------------------------------------------------------
   // Events
   // ---------------------------------------------------------------------------
@@ -319,16 +342,22 @@ class BackgroundRiveWidgetController {
   /// Drains pending Rive state-machine reported events.
   ///
   /// Calls `RiveThreadedBindings.pollEvents` in a loop with [maxEvents] as
-  /// the per-call cap, accumulating until a non-full batch arrives. The cap
-  /// matches the C++-side `riveThreadedPollEvents` truncation, so any depth
-  /// queued between Flutter post-frame ticks surfaces in full instead of
-  /// silently dropping past the cap.
-  List<RiveThreadedEvent> pollEvents({int maxEvents = kDefaultPollCap}) {
+  /// the per-call cap, accumulating until a non-full batch arrives or the
+  /// iteration cap is hit. The per-call cap matches the C++-side
+  /// `riveThreadedPollEvents` truncation, so any depth queued between Flutter
+  /// post-frame ticks surfaces in full instead of silently dropping past the
+  /// cap. [onCapHit] fires if the iteration ceiling is reached (events may
+  /// still be queued past the returned batch).
+  List<RiveThreadedEvent> pollEvents({
+    int maxEvents = kDefaultPollCap,
+    void Function(int maxEvents)? onCapHit,
+  }) {
     final bindings = _bindings;
     if (bindings == null) return const [];
     return drainPolls<RiveThreadedEvent>(
       poll: (n) => bindings.pollEvents(maxEvents: n),
       maxEvents: maxEvents,
+      onCapHit: onCapHit,
     );
   }
 
