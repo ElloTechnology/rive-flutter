@@ -6,6 +6,8 @@
 
 import 'package:rive_native/rive_native.dart';
 
+import 'event_drainer.dart';
+
 class SnapshotEntry {
   final String name;
   final int type;
@@ -23,6 +25,12 @@ class RiveThreadedEvent {
   const RiveThreadedEvent(this.name, this.secondsDelay);
 }
 
+class ThreadedFrame {
+  final List<SnapshotEntry> properties;
+  final List<RiveThreadedEvent> events;
+  const ThreadedFrame({required this.properties, required this.events});
+}
+
 class BackgroundRiveWidgetController {
   BackgroundRiveWidgetController({
     required Artboard artboard,
@@ -31,6 +39,7 @@ class BackgroundRiveWidgetController {
   });
 
   bool get isInitialized => false;
+  bool get hasFatalError => false;
 
   RenderTexture get renderTexture =>
       throw UnsupportedError('Background rendering is not supported on web');
@@ -53,7 +62,16 @@ class BackgroundRiveWidgetController {
   void watchProperty(String name) {}
   void unwatchProperty(String name) {}
   List<SnapshotEntry> acquireSnapshot({int maxProperties = 32}) => const [];
-  List<RiveThreadedEvent> pollEvents({int maxEvents = 128}) => const [];
+  ThreadedFrame acquireFrame({
+    int maxProperties = 64,
+    int maxEvents = kDefaultPollCap,
+  }) =>
+      const ThreadedFrame(properties: [], events: []);
+  List<RiveThreadedEvent> pollEvents({
+    int maxEvents = kDefaultPollCap,
+    void Function(int maxEvents)? onCapHit,
+  }) =>
+      const [];
   void pointerDown(double x, double y, {int pointerId = 0}) {}
   void pointerMove(double x, double y, {int pointerId = 0}) {}
   void pointerUp(double x, double y, {int pointerId = 0}) {}
