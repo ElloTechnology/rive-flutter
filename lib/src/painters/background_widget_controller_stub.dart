@@ -42,6 +42,7 @@ class BackgroundRiveWidgetController {
   }) async =>
       false;
 
+  void claimNativeOwnership() {}
   void dispose() {}
   void advance(double elapsedSeconds) {}
   void setEnumProperty(String name, String value) {}

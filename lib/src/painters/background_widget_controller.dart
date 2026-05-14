@@ -60,6 +60,12 @@ class BackgroundRiveWidgetController {
   RenderTexture? _renderTexture;
   RiveThreadedBindings? _bindings;
 
+  /// Cached raw pointer for [artboard], set by [claimNativeOwnership].
+  Pointer<Void>? _cachedAbPtr;
+
+  /// Cached raw pointer for [stateMachine], set by [claimNativeOwnership].
+  Pointer<Void>? _cachedSmPtr;
+
   /// Properties queued via [watchProperty] before [initialize] completes.
   final List<String> _pendingWatchProperties = [];
 
@@ -76,6 +82,28 @@ class BackgroundRiveWidgetController {
   // ---------------------------------------------------------------------------
   // Lifecycle
   // ---------------------------------------------------------------------------
+
+  /// Synchronously transfers native ownership of [artboard] and [stateMachine]
+  /// from the originating [RiveWidgetController] to this controller.
+  ///
+  /// Call this immediately after construction (before any widget rebuild that
+  /// could trigger [RiveWidgetController.dispose]), then call [initialize]
+  /// asynchronously once layout dimensions are available.
+  ///
+  /// After this call the Dart [artboard] and [stateMachine] wrappers have
+  /// [_pointer] set to null, so any subsequent [dispose] on the original
+  /// controller is a safe no-op. [initialize] uses the cached pointer values
+  /// rather than reading from the (now-null) wrappers.
+  void claimNativeOwnership() {
+    _cachedAbPtr = _nativePtrOf(artboard);
+    _cachedSmPtr = _nativePtrOf(stateMachine);
+    if (artboard is FFIRiveArtboard) {
+      (artboard as FFIRiveArtboard).releaseNativeOwnership();
+    }
+    if (stateMachine is FFIStateMachine) {
+      (stateMachine as FFIStateMachine).releaseNativeOwnership();
+    }
+  }
 
   /// Initialises the [RenderTexture] and the native [ThreadedScene] binding.
   ///
@@ -105,8 +133,11 @@ class BackgroundRiveWidgetController {
       return false;
     }
 
-    final abPtr = _nativePtrOf(artboard);
-    final smPtr = _nativePtrOf(stateMachine);
+    // Use cached pointers if claimNativeOwnership() was called synchronously
+    // before this (async) initialize(); fall back to reading from the wrappers
+    // if ownership has not been claimed yet.
+    final abPtr = _cachedAbPtr ?? _nativePtrOf(artboard);
+    final smPtr = _cachedSmPtr ?? _nativePtrOf(stateMachine);
     final vmiPtr = _nativePtrOf(viewModelInstance);
 
     if (abPtr == nullptr || smPtr == nullptr) {
@@ -129,12 +160,14 @@ class BackgroundRiveWidgetController {
       return false;
     }
 
-    // Transfer native ownership so Dart finalizers don't double-free.
-    if (artboard is FFIRiveArtboard) {
-      (artboard as FFIRiveArtboard).releaseNativeOwnership();
-    }
-    if (stateMachine is FFIStateMachine) {
-      (stateMachine as FFIStateMachine).releaseNativeOwnership();
+    // Transfer native ownership if not already done via claimNativeOwnership().
+    if (_cachedAbPtr == null) {
+      if (artboard is FFIRiveArtboard) {
+        (artboard as FFIRiveArtboard).releaseNativeOwnership();
+      }
+      if (stateMachine is FFIStateMachine) {
+        (stateMachine as FFIStateMachine).releaseNativeOwnership();
+      }
     }
 
     _renderTexture = rt;
