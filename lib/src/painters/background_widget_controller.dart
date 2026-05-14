@@ -32,6 +32,8 @@ import 'event_drainer.dart';
 /// - The native [ThreadedScene] owns the artboard and state machine via
 ///   `unique_ptr`. [releaseNativeOwnership] is called on the Dart wrappers so
 ///   their [NativeFinalizer]s do not attempt a double-free.
+/// - If initialization fails before [ThreadedScene] creation, this controller
+///   disposes any native pointers claimed from the Dart wrappers.
 /// - The ViewModel instance is ref-counted; both Dart and C++ hold a ref.
 /// - The [RenderTexture] is owned by this controller and disposed in [dispose].
 ///
@@ -68,6 +70,9 @@ class BackgroundRiveWidgetController {
   /// Cached raw pointer for [stateMachine], set by [claimNativeOwnership].
   Pointer<Void>? _cachedSmPtr;
 
+  Factory? _cachedArtboardFactory;
+  bool _ownsClaimedNativePointers = false;
+
   /// Properties queued via [watchProperty] before [initialize] completes.
   final List<String> _pendingWatchProperties = [];
 
@@ -97,14 +102,25 @@ class BackgroundRiveWidgetController {
   /// controller is a safe no-op. [initialize] uses the cached pointer values
   /// rather than reading from the (now-null) wrappers.
   void claimNativeOwnership() {
-    _cachedAbPtr = _nativePtrOf(artboard);
-    _cachedSmPtr = _nativePtrOf(stateMachine);
-    if (artboard is FFIRiveArtboard) {
-      (artboard as FFIRiveArtboard).releaseNativeOwnership();
+    if (_ownsClaimedNativePointers || isInitialized) return;
+
+    final ffiArtboard = artboard;
+    final ffiStateMachine = stateMachine;
+    if (ffiArtboard is! FFIRiveArtboard ||
+        ffiStateMachine is! FFIStateMachine) {
+      return;
     }
-    if (stateMachine is FFIStateMachine) {
-      (stateMachine as FFIStateMachine).releaseNativeOwnership();
-    }
+
+    final abPtr = ffiArtboard.pointer;
+    final smPtr = ffiStateMachine.pointer;
+    if (abPtr == nullptr || smPtr == nullptr) return;
+
+    _cachedAbPtr = abPtr;
+    _cachedSmPtr = smPtr;
+    _cachedArtboardFactory = ffiArtboard.riveFactory;
+    ffiArtboard.releaseNativeOwnership();
+    ffiStateMachine.releaseNativeOwnership();
+    _ownsClaimedNativePointers = true;
   }
 
   /// Initialises the [RenderTexture] and the native [ThreadedScene] binding.
@@ -130,17 +146,20 @@ class BackgroundRiveWidgetController {
     // controller that has already been torn down.
     if (_isDisposed) {
       rt.dispose();
+      _disposeClaimedNativePointers();
       return false;
     }
 
     if (!rt.isReady) {
       rt.dispose();
+      _disposeClaimedNativePointers();
       return false;
     }
 
     final rendererPtr = rt.nativeRendererPtr;
     if (rendererPtr is! Pointer<Void> || rendererPtr == nullptr) {
       rt.dispose();
+      _disposeClaimedNativePointers();
       return false;
     }
 
@@ -153,11 +172,13 @@ class BackgroundRiveWidgetController {
 
     if (abPtr == nullptr || smPtr == nullptr) {
       rt.dispose();
+      _disposeClaimedNativePointers();
       return false;
     }
 
     if (_isDisposed) {
       rt.dispose();
+      _disposeClaimedNativePointers();
       return false;
     }
 
@@ -173,8 +194,11 @@ class BackgroundRiveWidgetController {
 
     if (bindings == null) {
       rt.dispose();
+      _disposeClaimedNativePointers();
       return false;
     }
+
+    _ownsClaimedNativePointers = false;
 
     // Final check: dispose() could have raced in between create() and here.
     // Dispose both allocations so no native resources are leaked.
@@ -212,10 +236,30 @@ class BackgroundRiveWidgetController {
     _isDisposed = true;
     _bindings?.dispose();
     _bindings = null;
+    _disposeClaimedNativePointers();
     _renderTexture?.dispose();
     _renderTexture = null;
     // Artboard/SM are owned by C++ (already released above).
     // ViewModelInstance retains normal Dart ownership — caller disposes it.
+  }
+
+  void _disposeClaimedNativePointers() {
+    if (!_ownsClaimedNativePointers) return;
+
+    _ownsClaimedNativePointers = false;
+    final abPtr = _cachedAbPtr;
+    final smPtr = _cachedSmPtr;
+    final artboardFactory = _cachedArtboardFactory;
+    _cachedAbPtr = null;
+    _cachedSmPtr = null;
+    _cachedArtboardFactory = null;
+
+    if (abPtr != null && abPtr != nullptr && artboardFactory != null) {
+      FFIRiveArtboard(abPtr, artboardFactory).dispose();
+    }
+    if (smPtr != null && smPtr != nullptr) {
+      FFIStateMachine(smPtr).dispose();
+    }
   }
 
   // ---------------------------------------------------------------------------
