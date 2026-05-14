@@ -35,6 +35,8 @@ import 'event_drainer.dart';
 /// - If initialization fails before [ThreadedScene] creation, this controller
 ///   disposes any native pointers claimed from the Dart wrappers.
 /// - The ViewModel instance is ref-counted; both Dart and C++ hold a ref.
+///   While this controller is initialized, callers must route ViewModel writes
+///   through this controller so they are applied on the background thread.
 /// - The [RenderTexture] is owned by this controller and disposed in [dispose].
 ///
 /// ## Lifecycle
@@ -141,6 +143,7 @@ class BackgroundRiveWidgetController {
     required double devicePixelRatio,
   }) async {
     if (_isDisposed) return false;
+    if (isInitialized) return true;
     assert(!isInitialized, 'initialize() called more than once');
 
     final rt = RiveNative.instance.makeRenderTexture();
