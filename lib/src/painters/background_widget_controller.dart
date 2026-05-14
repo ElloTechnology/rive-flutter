@@ -70,7 +70,6 @@ class BackgroundRiveWidgetController {
   /// Cached raw pointer for [stateMachine], set by [claimNativeOwnership].
   Pointer<Void>? _cachedSmPtr;
 
-  Factory? _cachedArtboardFactory;
   bool _ownsClaimedNativePointers = false;
 
   /// Properties queued via [watchProperty] before [initialize] completes.
@@ -124,7 +123,6 @@ class BackgroundRiveWidgetController {
 
     _cachedAbPtr = abPtr;
     _cachedSmPtr = smPtr;
-    _cachedArtboardFactory = ffiArtboard.riveFactory;
     ffiArtboard.releaseNativeOwnership();
     ffiStateMachine.releaseNativeOwnership();
     _ownsClaimedNativePointers = true;
@@ -170,11 +168,10 @@ class BackgroundRiveWidgetController {
       return false;
     }
 
-    // Use cached pointers if claimNativeOwnership() was called synchronously
-    // before this (async) initialize(); fall back to reading from the wrappers
-    // if ownership has not been claimed yet.
-    final abPtr = _cachedAbPtr ?? _nativePtrOf(artboard);
-    final smPtr = _cachedSmPtr ?? _nativePtrOf(stateMachine);
+    claimNativeOwnership();
+
+    final abPtr = _cachedAbPtr ?? nullptr;
+    final smPtr = _cachedSmPtr ?? nullptr;
     final vmiPtr = _nativePtrOf(viewModelInstance);
 
     if (abPtr == nullptr || smPtr == nullptr) {
@@ -215,16 +212,6 @@ class BackgroundRiveWidgetController {
       return false;
     }
 
-    // Transfer native ownership if not already done via claimNativeOwnership().
-    if (_cachedAbPtr == null) {
-      if (artboard is FFIRiveArtboard) {
-        (artboard as FFIRiveArtboard).releaseNativeOwnership();
-      }
-      if (stateMachine is FFIStateMachine) {
-        (stateMachine as FFIStateMachine).releaseNativeOwnership();
-      }
-    }
-
     _renderTexture = rt;
     _bindings = bindings;
 
@@ -256,16 +243,14 @@ class BackgroundRiveWidgetController {
     _ownsClaimedNativePointers = false;
     final abPtr = _cachedAbPtr;
     final smPtr = _cachedSmPtr;
-    final artboardFactory = _cachedArtboardFactory;
     _cachedAbPtr = null;
     _cachedSmPtr = null;
-    _cachedArtboardFactory = null;
 
-    if (abPtr != null && abPtr != nullptr && artboardFactory != null) {
-      FFIRiveArtboard(abPtr, artboardFactory).dispose();
+    if (abPtr != null && abPtr != nullptr) {
+      RiveThreadedBindings.releaseClaimedArtboard(abPtr);
     }
     if (smPtr != null && smPtr != nullptr) {
-      FFIStateMachine(smPtr).dispose();
+      RiveThreadedBindings.releaseClaimedStateMachine(smPtr);
     }
   }
 
