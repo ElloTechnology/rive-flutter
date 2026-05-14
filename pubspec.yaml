@@ -31,4 +31,5 @@ dependency_overrides:
   rive_native:
     git:
       url: https://github.com/ElloTechnology/rive-native.git
-      ref: ef5b70e
+      # branch ello-2026-05-review at pin time
+      ref: ef5b70ea7e3b1d8743ce77d772acc924dd1f5037
