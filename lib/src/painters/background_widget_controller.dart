@@ -60,6 +60,8 @@ class BackgroundRiveWidgetController {
   RenderTexture? _renderTexture;
   RiveThreadedBindings? _bindings;
 
+  bool _isDisposed = false;
+
   /// Cached raw pointer for [artboard], set by [claimNativeOwnership].
   Pointer<Void>? _cachedAbPtr;
 
@@ -117,10 +119,19 @@ class BackgroundRiveWidgetController {
     required int height,
     required double devicePixelRatio,
   }) async {
+    if (_isDisposed) return false;
     assert(!isInitialized, 'initialize() called more than once');
 
     final rt = RiveNative.instance.makeRenderTexture();
     await rt.makeRenderTexture(width, height);
+
+    // dispose() may have been called while the render-texture allocation was
+    // awaited. Abandon the allocation rather than completing a binding for a
+    // controller that has already been torn down.
+    if (_isDisposed) {
+      rt.dispose();
+      return false;
+    }
 
     if (!rt.isReady) {
       rt.dispose();
@@ -145,6 +156,11 @@ class BackgroundRiveWidgetController {
       return false;
     }
 
+    if (_isDisposed) {
+      rt.dispose();
+      return false;
+    }
+
     final bindings = RiveThreadedBindings.create(
       metalTextureRenderer: rendererPtr,
       artboard: abPtr,
@@ -156,6 +172,14 @@ class BackgroundRiveWidgetController {
     );
 
     if (bindings == null) {
+      rt.dispose();
+      return false;
+    }
+
+    // Final check: dispose() could have raced in between create() and here.
+    // Dispose both allocations so no native resources are leaked.
+    if (_isDisposed) {
+      bindings.dispose();
       rt.dispose();
       return false;
     }
@@ -185,6 +209,7 @@ class BackgroundRiveWidgetController {
   /// Stops the background thread, unregisters the Flutter texture, and
   /// disposes the [RenderTexture].
   void dispose() {
+    _isDisposed = true;
     _bindings?.dispose();
     _bindings = null;
     _renderTexture?.dispose();
