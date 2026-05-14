@@ -49,8 +49,12 @@ class BackgroundRiveView extends StatefulWidget {
 
 class _BackgroundRiveViewState extends State<BackgroundRiveView>
     with SingleTickerProviderStateMixin {
+  static const int _maxInitRetries = 120;
+
   Ticker? _ticker;
   bool _initialized = false;
+  bool _initializing = false;
+  int _initRetries = 0;
   Duration _prevDuration = Duration.zero;
 
   @override
@@ -68,12 +72,20 @@ class _BackgroundRiveViewState extends State<BackgroundRiveView>
     super.dispose();
   }
 
+  bool _scheduleRetry() {
+    if (_initRetries++ >= _maxInitRetries) return false;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryInitialize());
+    return true;
+  }
+
   Future<void> _tryInitialize() async {
-    if (!mounted || _initialized) return;
+    if (!mounted || _initialized || _initializing) return;
+    _initializing = true;
 
     final renderBox = context.findRenderObject();
     if (renderBox is! RenderBox || !renderBox.hasSize) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _tryInitialize());
+      _initializing = false;
+      _scheduleRetry();
       return;
     }
 
@@ -83,7 +95,8 @@ class _BackgroundRiveViewState extends State<BackgroundRiveView>
     final h = (size.height * dpr).round();
 
     if (w <= 0 || h <= 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _tryInitialize());
+      _initializing = false;
+      _scheduleRetry();
       return;
     }
 
@@ -93,9 +106,13 @@ class _BackgroundRiveViewState extends State<BackgroundRiveView>
       devicePixelRatio: dpr,
     );
 
-    if (!mounted || !success) return;
+    if (!mounted || !success) {
+      _initializing = false;
+      return;
+    }
 
     _initialized = true;
+    _initializing = false;
     _ticker = createTicker(_onTick)..start();
     setState(() {});
   }
@@ -103,6 +120,8 @@ class _BackgroundRiveViewState extends State<BackgroundRiveView>
   void _onTick(Duration elapsed) {
     final dt = elapsed - _prevDuration;
     _prevDuration = elapsed;
+    if (widget.freeze) return;
+
     final elapsedSeconds =
         dt.inMicroseconds / Duration.microsecondsPerSecond;
 
