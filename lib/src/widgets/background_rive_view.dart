@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:rive_native/rive_native.dart' show Fit;
 
 import 'package:rive/src/painters/background_widget_controller_stub.dart'
     if (dart.library.ffi) 'package:rive/src/painters/background_widget_controller.dart';
@@ -33,11 +34,23 @@ class BackgroundRiveView extends StatefulWidget {
   const BackgroundRiveView({
     super.key,
     required this.controller,
+    this.fit = Fit.contain,
+    this.alignment = Alignment.center,
     this.freeze = false,
   });
 
   /// The controller that owns the background thread and ViewModel interactions.
   final BackgroundRiveWidgetController controller;
+
+  /// How the artboard is fitted into the available view. Forwarded to the
+  /// native [ThreadedScene] at initialize-time; changing this after
+  /// [BackgroundRiveWidgetController.initialize] has no effect.
+  final Fit fit;
+
+  /// How the fitted artboard is aligned within the view. Forwarded to the
+  /// native [ThreadedScene] at initialize-time; changing this after
+  /// [BackgroundRiveWidgetController.initialize] has no effect.
+  final Alignment alignment;
 
   /// When true, Flutter will not request new frames from the texture even when
   /// the GPU content changes. Useful for pausing without disposing.
@@ -104,6 +117,8 @@ class _BackgroundRiveViewState extends State<BackgroundRiveView>
       width: w,
       height: h,
       devicePixelRatio: dpr,
+      fit: widget.fit,
+      alignment: widget.alignment,
     );
 
     if (!mounted || !success) {
