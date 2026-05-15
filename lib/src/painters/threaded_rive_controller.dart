@@ -8,7 +8,7 @@ import 'package:rive_native/src/ffi/rive_ffi_reference.dart'
     show RiveFFIReference;
 // ignore: implementation_imports
 import 'package:rive_native/src/ffi/rive_ffi.dart'
-    show FFIRiveArtboard, FFIStateMachine;
+    show FFIRiveArtboard, FFIRiveViewModelInstanceRuntime, FFIStateMachine;
 // ignore: implementation_imports
 import 'package:rive_native/src/ffi/rive_threaded_ffi.dart';
 import 'package:rive_native/rive_native.dart';
@@ -74,6 +74,13 @@ class ThreadedRiveController {
   /// Cached raw pointer for [stateMachine], set by [claimNativeOwnership].
   Pointer<Void>? _cachedSmPtr;
 
+  /// Cached raw pointer for [viewModelInstance], set by [claimNativeOwnership].
+  /// Captured synchronously so the worker still receives the C++ handle even
+  /// if the Dart [ViewModelInstance] is disposed before [initialize] runs
+  /// (e.g. by a widget unmount triggered by the same `setState` that activates
+  /// threaded rendering).
+  Pointer<Void>? _cachedVmiPtr;
+
   bool _ownsClaimedNativePointers = false;
 
   /// Properties queued via [watchProperty] before [initialize] completes.
@@ -129,6 +136,27 @@ class ThreadedRiveController {
     _cachedSmPtr = smPtr;
     ffiArtboard.releaseNativeOwnership();
     ffiStateMachine.releaseNativeOwnership();
+
+    // Capture and detach the VMI native pointer synchronously too. Without
+    // this, a widget rebuild that follows a setState activating threaded mode
+    // can unmount the originating RiveBuilder, whose dispose() calls
+    // viewModelInstance.dispose() → frees the WrappedVMIRuntime native object
+    // and nulls _pointer. By the time the asynchronous initialize() reads
+    // viewModelInstance.pointer it would be nullptr, leaving
+    // ThreadedScene::m_viewModelInstance null and dropping every input write
+    // with `setViewModelEnum: no input named '<name>'`. The C++ side still
+    // ref-counts the underlying ViewModelInstanceRuntime via
+    // riveThreadedRefViewModelInstance, so detaching the Dart finalizer here
+    // is safe — only the WrappedVMIRuntime Dart wrapper is released.
+    final ffiVmi = viewModelInstance;
+    if (ffiVmi is FFIRiveViewModelInstanceRuntime) {
+      final vmiPtr = ffiVmi.pointer;
+      if (vmiPtr != nullptr) {
+        _cachedVmiPtr = vmiPtr;
+        ffiVmi.releaseNativeOwnership();
+      }
+    }
+
     _ownsClaimedNativePointers = true;
   }
 
@@ -179,7 +207,10 @@ class ThreadedRiveController {
 
     final abPtr = _cachedAbPtr ?? nullptr;
     final smPtr = _cachedSmPtr ?? nullptr;
-    final vmiPtr = _nativePtrOf(viewModelInstance);
+    // Prefer the pointer captured during claimNativeOwnership — the Dart
+    // [viewModelInstance] wrapper may have been disposed before this async
+    // initialize runs (see comment in claimNativeOwnership above).
+    final vmiPtr = _cachedVmiPtr ?? _nativePtrOf(viewModelInstance);
 
     if (abPtr == nullptr || smPtr == nullptr) {
       rt.dispose();
