@@ -4,6 +4,7 @@
 /// supported on web. This stub provides the same public API surface so that
 /// the types are importable on web, but [initialize] always returns `false`.
 
+import 'package:flutter/widgets.dart' show Alignment;
 import 'package:rive_native/rive_native.dart';
 
 import 'event_drainer.dart';
@@ -48,6 +49,8 @@ class BackgroundRiveWidgetController {
     required int width,
     required int height,
     required double devicePixelRatio,
+    Fit fit = Fit.contain,
+    Alignment alignment = Alignment.center,
   }) async =>
       false;
 

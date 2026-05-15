@@ -1,5 +1,7 @@
 import 'dart:ffi';
 
+import 'package:flutter/widgets.dart' show Alignment;
+
 // Internal import to access raw native pointers for artboard/SM/VMI handoff.
 // ignore: implementation_imports
 import 'package:rive_native/src/ffi/rive_ffi_reference.dart'
@@ -141,6 +143,8 @@ class BackgroundRiveWidgetController {
     required int width,
     required int height,
     required double devicePixelRatio,
+    Fit fit = Fit.contain,
+    Alignment alignment = Alignment.center,
   }) async {
     if (_isDisposed) return false;
     if (isInitialized) return true;
@@ -197,6 +201,9 @@ class BackgroundRiveWidgetController {
       width: width,
       height: height,
       devicePixelRatio: devicePixelRatio,
+      fit: fit.index,
+      alignmentX: alignment.x,
+      alignmentY: alignment.y,
     );
 
     if (bindings == null) {
