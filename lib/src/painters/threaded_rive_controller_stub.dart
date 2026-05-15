@@ -1,6 +1,6 @@
-/// Web stub for [BackgroundRiveWidgetController].
+/// Web stub for [ThreadedRiveController].
 ///
-/// Background rendering requires native Metal/Vulkan GPU access and is not
+/// Threaded rendering requires native Metal/Vulkan GPU access and is not
 /// supported on web. This stub provides the same public API surface so that
 /// the types are importable on web, but [initialize] always returns `false`.
 
@@ -32,8 +32,8 @@ class ThreadedFrame {
   const ThreadedFrame({required this.properties, required this.events});
 }
 
-class BackgroundRiveWidgetController {
-  BackgroundRiveWidgetController({
+class ThreadedRiveController {
+  ThreadedRiveController({
     required Artboard artboard,
     required StateMachine stateMachine,
     ViewModelInstance? viewModelInstance,
@@ -43,7 +43,7 @@ class BackgroundRiveWidgetController {
   bool get hasFatalError => false;
 
   RenderTexture get renderTexture =>
-      throw UnsupportedError('Background rendering is not supported on web');
+      throw UnsupportedError('Threaded rendering is not supported on web');
 
   Future<bool> initialize({
     required int width,

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:rive_native/rive_native.dart' show Fit;
 
-import 'package:rive/src/painters/background_widget_controller_stub.dart'
-    if (dart.library.ffi) 'package:rive/src/painters/background_widget_controller.dart';
+import 'package:rive/src/painters/threaded_rive_controller_stub.dart'
+    if (dart.library.ffi) 'package:rive/src/painters/threaded_rive_controller.dart';
 
 /// A Flutter widget that composites Rive content rendered by a C++ background
 /// thread.
@@ -11,7 +11,7 @@ import 'package:rive/src/painters/background_widget_controller_stub.dart'
 /// Unlike [RiveWidget], this widget never calls `advanceAndApply` or `draw`
 /// on the Flutter UI thread. Instead it:
 ///
-/// 1. After first layout, calls [BackgroundRiveWidgetController.initialize]
+/// 1. After first layout, calls [ThreadedRiveController.initialize]
 ///    to start the native [ThreadedScene] and register a Flutter GPU texture.
 /// 2. Runs a [Ticker] that calls [controller.advance] each frame, posting
 ///    elapsed time to the background thread (non-blocking).
@@ -27,11 +27,11 @@ import 'package:rive/src/painters/background_widget_controller_stub.dart'
 ///
 /// ## Platform support
 ///
-/// Background rendering requires Metal (iOS / macOS). On other platforms
-/// [BackgroundRiveWidgetController.initialize] returns false and this widget
+/// Threaded rendering requires Metal (iOS / macOS). On other platforms
+/// [ThreadedRiveController.initialize] returns false and this widget
 /// shows a transparent [SizedBox].
-class BackgroundRiveView extends StatefulWidget {
-  const BackgroundRiveView({
+class ThreadedRiveView extends StatefulWidget {
+  const ThreadedRiveView({
     super.key,
     required this.controller,
     this.fit = Fit.contain,
@@ -40,16 +40,16 @@ class BackgroundRiveView extends StatefulWidget {
   });
 
   /// The controller that owns the background thread and ViewModel interactions.
-  final BackgroundRiveWidgetController controller;
+  final ThreadedRiveController controller;
 
   /// How the artboard is fitted into the available view. Forwarded to the
   /// native [ThreadedScene] at initialize-time; changing this after
-  /// [BackgroundRiveWidgetController.initialize] has no effect.
+  /// [ThreadedRiveController.initialize] has no effect.
   final Fit fit;
 
   /// How the fitted artboard is aligned within the view. Forwarded to the
   /// native [ThreadedScene] at initialize-time; changing this after
-  /// [BackgroundRiveWidgetController.initialize] has no effect.
+  /// [ThreadedRiveController.initialize] has no effect.
   final Alignment alignment;
 
   /// When true, Flutter will not request new frames from the texture even when
@@ -57,10 +57,10 @@ class BackgroundRiveView extends StatefulWidget {
   final bool freeze;
 
   @override
-  State<BackgroundRiveView> createState() => _BackgroundRiveViewState();
+  State<ThreadedRiveView> createState() => _ThreadedRiveViewState();
 }
 
-class _BackgroundRiveViewState extends State<BackgroundRiveView>
+class _ThreadedRiveViewState extends State<ThreadedRiveView>
     with SingleTickerProviderStateMixin {
   static const int _maxInitRetries = 120;
 

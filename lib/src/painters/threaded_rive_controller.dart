@@ -47,10 +47,10 @@ import 'event_drainer.dart';
 ///    [viewModelInstance].
 /// 2. Call [initialize] once the layout size is known (async — awaits
 ///    [RenderTexture.makeRenderTexture]).
-/// 3. [BackgroundRiveView] drives the ticker and calls [advance] each frame.
+/// 3. [ThreadedRiveView] drives the ticker and calls [advance] each frame.
 /// 4. Call [dispose] when done.
-class BackgroundRiveWidgetController {
-  BackgroundRiveWidgetController({
+class ThreadedRiveController {
+  ThreadedRiveController({
     required this.artboard,
     required this.stateMachine,
     this.viewModelInstance,
@@ -88,7 +88,7 @@ class BackgroundRiveWidgetController {
   /// path. The flag is one-way and survives until [dispose].
   bool get hasFatalError => _bindings?.hasFatalError ?? false;
 
-  /// The [RenderTexture] whose [textureId] [BackgroundRiveView] composites.
+  /// The [RenderTexture] whose [textureId] [ThreadedRiveView] composites.
   ///
   /// Valid only after [initialize] returns `true`.
   RenderTexture get renderTexture {
