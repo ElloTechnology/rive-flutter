@@ -39,8 +39,12 @@ class ThreadedRiveController {
     ViewModelInstance? viewModelInstance,
   });
 
+  static ThreadedRiveController? get debugActiveController => null;
+
   bool get isInitialized => false;
   bool get hasFatalError => false;
+  int get advanceCount => 0;
+  int get renderedCount => 0;
 
   RenderTexture get renderTexture =>
       throw UnsupportedError('Threaded rendering is not supported on web');
