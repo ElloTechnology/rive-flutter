@@ -56,6 +56,17 @@ class ThreadedRiveController {
     this.viewModelInstance,
   });
 
+  /// Most recently initialized [ThreadedRiveController], or `null` if none is
+  /// alive. Set during [initialize] success and cleared in [dispose].
+  ///
+  /// Intended for the threaded-rive bench harness, which needs to read
+  /// [advanceCount] / [renderedCount] without plumbing a controller reference
+  /// through every layer. Do NOT use from production code — if more than one
+  /// controller is alive at once, only the latest is visible here.
+  static ThreadedRiveController? get debugActiveController =>
+      _debugActiveController;
+  static ThreadedRiveController? _debugActiveController;
+
   final Artboard artboard;
   final StateMachine stateMachine;
 
@@ -94,6 +105,20 @@ class ThreadedRiveController {
   /// caller should tear down this controller and fall back to the synchronous
   /// path. The flag is one-way and survives until [dispose].
   bool get hasFatalError => _bindings?.hasFatalError ?? false;
+
+  /// Total bg-thread cycles completed since this controller was initialized.
+  /// Bumped once per native `runOneFrame` (state-machine advance + snapshot +
+  /// event collection), regardless of whether the render callback produced a
+  /// new image. Diverges from [renderedCount] when the render callback
+  /// no-ops (zero-size surface, paused worker, future damage tracking).
+  ///
+  /// Diagnostic-only — used by the threaded-rive bench harness to expose the
+  /// bg cycle rate decoupled from the flutter frame rate.
+  int get advanceCount => _bindings?.advanceCount ?? 0;
+
+  /// Total bg-thread cycles that produced a new RenderImage. Subset of
+  /// [advanceCount]. Diagnostic-only.
+  int get renderedCount => _bindings?.renderedCount ?? 0;
 
   /// The [RenderTexture] whose [textureId] [ThreadedRiveView] composites.
   ///
@@ -255,6 +280,7 @@ class ThreadedRiveController {
 
     _renderTexture = rt;
     _bindings = bindings;
+    _debugActiveController = this;
 
     // Flush any watchProperty calls made before initialization completed.
     for (final name in _pendingWatchProperties) {
@@ -271,6 +297,9 @@ class ThreadedRiveController {
     _isDisposed = true;
     _bindings?.dispose();
     _bindings = null;
+    if (identical(_debugActiveController, this)) {
+      _debugActiveController = null;
+    }
     _disposeClaimedNativePointers();
     _renderTexture?.dispose();
     _renderTexture = null;
