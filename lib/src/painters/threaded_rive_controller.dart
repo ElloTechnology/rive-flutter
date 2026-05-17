@@ -118,7 +118,32 @@ class ThreadedRiveController {
 
   /// Total bg-thread cycles that produced a new RenderImage. Subset of
   /// [advanceCount]. Diagnostic-only.
+  ///
+  /// **On Android this is uniformly 0** — the bg render callback is
+  /// GPU-direct (the texture is the output) and never returns an
+  /// `rcp<RenderImage>`. Use [gpuRenderCount] on Android instead.
   int get renderedCount => _bindings?.renderedCount ?? 0;
+
+  /// Authoritative "frame painted" counter on Android. Bumps each time
+  /// `clear` + `makeRenderer` + `flush` all succeed in the bg-thread
+  /// render callback. Zero on platforms whose render callback returns
+  /// an in-memory image (use [renderedCount] there).
+  int get gpuRenderCount => _bindings?.gpuRenderCount ?? 0;
+
+  /// Consecutive bg cycles where the render callback failed. Resets to 0
+  /// on each successful render. Crosses 30 (≈500ms at 60Hz) when
+  /// [renderStalled] flips true.
+  int get consecutiveRenderFailures =>
+      _bindings?.consecutiveRenderFailures ?? 0;
+
+  /// True when the bg path has produced no successful frames for >30
+  /// consecutive cycles. Distinct from [hasFatalError]: a stall doesn't
+  /// halt the worker (the state machine keeps advancing), it just
+  /// signals nothing is being painted. The most common cause is the
+  /// device's GL driver not supporting PLS — look for `Rive
+  /// AndroidRenderTexture: Renderer (PLS) NOT supported` in logcat at
+  /// error level.
+  bool get renderStalled => _bindings?.renderStalled ?? false;
 
   /// The [RenderTexture] whose [textureId] [ThreadedRiveView] composites.
   ///

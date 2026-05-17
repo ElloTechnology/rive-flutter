@@ -45,6 +45,9 @@ class ThreadedRiveController {
   bool get hasFatalError => false;
   int get advanceCount => 0;
   int get renderedCount => 0;
+  int get gpuRenderCount => 0;
+  int get consecutiveRenderFailures => 0;
+  bool get renderStalled => false;
 
   RenderTexture get renderTexture =>
       throw UnsupportedError('Threaded rendering is not supported on web');
