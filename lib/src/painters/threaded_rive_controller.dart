@@ -14,6 +14,15 @@ import 'package:rive_native/src/ffi/rive_ffi.dart'
 import 'package:rive_native/src/ffi/rive_threaded_ffi.dart';
 import 'package:rive_native/rive_native.dart';
 
+// Re-export the public-API types from the rive_native FFI library so callers
+// (apps + tests) can name them via `package:rive/rive.dart` without an
+// `implementation_imports` lint. The web stub
+// (`threaded_rive_controller_stub.dart`) defines these names locally, so the
+// conditional-export in `lib/rive.dart` keeps the public surface consistent
+// across platforms.
+export 'package:rive_native/src/ffi/rive_threaded_ffi.dart'
+    show ThreadedFrame, SnapshotEntry, RiveThreadedEvent, SnapshotValueType;
+
 import 'event_drainer.dart';
 
 /// A controller for Rive content that advances and renders on a dedicated C++
