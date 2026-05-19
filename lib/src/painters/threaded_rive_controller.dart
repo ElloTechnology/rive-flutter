@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:isolate';
 
 import 'package:flutter/widgets.dart' show Alignment;
 
@@ -47,7 +48,9 @@ import 'event_drainer.dart';
 ///    [viewModelInstance].
 /// 2. Call [initialize] once the layout size is known (async — awaits
 ///    [RenderTexture.makeRenderTexture]).
-/// 3. [ThreadedRiveView] drives the ticker and calls [advance] each frame.
+/// 3. Caller subscribes a `ReceivePort` via [subscribePendingPort]; the C++
+///    worker posts after each bg cycle that produces output. The listener
+///    drains via [acquireFrame].
 /// 4. Call [dispose] when done.
 class ThreadedRiveController {
   ThreadedRiveController({
@@ -414,6 +417,17 @@ class ThreadedRiveController {
         maxEvents: maxEvents,
       ) ??
       const ThreadedFrame(properties: [], events: []);
+
+  /// Register [port] so the C++ worker posts `1` after each bg cycle that
+  /// produced output. At most one notification is in flight per binding;
+  /// the gate is cleared by the next [acquireFrame] call. No-op if the
+  /// controller is not initialized.
+  void subscribePendingPort(SendPort port) =>
+      _bindings?.subscribePendingPort(port);
+
+  /// Stop posting to the previously-registered port. Safe to call multiple
+  /// times. No-op if the controller is not initialized.
+  void unsubscribePendingPort() => _bindings?.unsubscribePendingPort();
 
   // ---------------------------------------------------------------------------
   // Events

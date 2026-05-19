@@ -4,6 +4,8 @@
 /// supported on web. This stub provides the same public API surface so that
 /// the types are importable on web, but [initialize] always returns `false`.
 
+import 'dart:isolate';
+
 import 'package:flutter/widgets.dart' show Alignment;
 import 'package:rive_native/rive_native.dart';
 
@@ -77,6 +79,8 @@ class ThreadedRiveController {
     int maxEvents = kDefaultPollCap,
   }) =>
       const ThreadedFrame(properties: [], events: []);
+  void subscribePendingPort(SendPort port) {}
+  void unsubscribePendingPort() {}
   List<RiveThreadedEvent> pollEvents({
     int maxEvents = kDefaultPollCap,
     void Function(int maxEvents)? onCapHit,
