@@ -11,9 +11,11 @@ import 'package:rive_native/rive_native.dart';
 
 import 'event_drainer.dart';
 
+enum SnapshotValueType { monostate, boolean, number, string }
+
 class SnapshotEntry {
   final String name;
-  final int type;
+  final SnapshotValueType type;
   final String rawValue;
   const SnapshotEntry({
     required this.name,
