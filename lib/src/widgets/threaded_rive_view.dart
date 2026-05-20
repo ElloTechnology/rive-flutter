@@ -37,6 +37,7 @@ class ThreadedRiveView extends StatefulWidget {
     this.fit = Fit.contain,
     this.alignment = Alignment.center,
     this.freeze = false,
+    this.targetFps = 0.0,
   });
 
   /// The controller that owns the background thread and ViewModel interactions.
@@ -55,6 +56,18 @@ class ThreadedRiveView extends StatefulWidget {
   /// When true, Flutter will not request new frames from the texture even when
   /// the GPU content changes. Useful for pausing without disposing.
   final bool freeze;
+
+  /// Target frames-per-second for the bg worker's self-paced render loop. `0`
+  /// keeps the legacy ticker-driven loop (bg renders only when the UI ticker
+  /// posts elapsed time). `> 0` lets the bg thread render at the configured
+  /// rate using `steady_clock` dt, decoupled from the UI ticker — useful
+  /// when paired with a renderer-side compositor wake (e.g. Android's
+  /// `SurfaceProducer.scheduleFrame` from `endFrame`) so Flutter draws at
+  /// the bg rate even while the UI tree is otherwise idle. Set to the
+  /// device-tier refresh cap (commonly 30 or 60) to bound bg CPU/GPU load.
+  /// Read once at `controller.initialize()` time; changes after init are
+  /// ignored.
+  final double targetFps;
 
   @override
   State<ThreadedRiveView> createState() => _ThreadedRiveViewState();
@@ -119,6 +132,7 @@ class _ThreadedRiveViewState extends State<ThreadedRiveView>
       devicePixelRatio: dpr,
       fit: widget.fit,
       alignment: widget.alignment,
+      targetFps: widget.targetFps,
     );
 
     if (!mounted || !success) {
@@ -141,7 +155,17 @@ class _ThreadedRiveViewState extends State<ThreadedRiveView>
         dt.inMicroseconds / Duration.microsecondsPerSecond;
 
     widget.controller.advance(elapsedSeconds);
-    setState(() {}); // trigger repaint to composite the latest GPU texture
+
+    // Mark the Texture's RenderObject needs paint so the next frame produces
+    // a fresh TextureLayer that samples the latest GPU texture content. A
+    // bare setState((){}) here is an identity-equal Texture rebuild —
+    // RenderTexture's props (textureId, freeze, filterQuality) don't change,
+    // so updateRenderObject is a no-op and the RenderObject stays clean.
+    // Without an explicit markNeedsPaint, Flutter's pipeline pacing parks
+    // vsync requests when nothing else is dirty and `vsync_p95` climbs to
+    // 50-140ms on idle Tier-1 Android. The findRenderObject call is cheap
+    // (one element walk) and only runs while the ticker is active.
+    context.findRenderObject()?.markNeedsPaint();
   }
 
   @override
