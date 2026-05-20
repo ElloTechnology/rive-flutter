@@ -251,6 +251,15 @@ class ThreadedRiveController {
     required double devicePixelRatio,
     Fit fit = Fit.contain,
     Alignment alignment = Alignment.center,
+    // Target FPS for the bg worker's self-paced render loop. `0` keeps the
+    // legacy behavior where the worker waits on `postElapsedTime` from the
+    // UI ticker — bg render rate is rate-locked to the ticker rate. `> 0`
+    // lets the worker self-pace using `steady_clock` dt, so the
+    // render-success `SurfaceProducer.scheduleFrame()` wake can drive
+    // Flutter's compositor at the configured rate even when the UI ticker
+    // is muted or running below the bg target. Pass the device-tier
+    // refresh cap (e.g. 30 or 60) to clamp the bg load on slow devices.
+    double targetFps = 0.0,
   }) async {
     if (_isDisposed) return false;
     if (isInitialized) return true;
@@ -313,6 +322,7 @@ class ThreadedRiveController {
       fit: fit.index,
       alignmentX: alignment.x,
       alignmentY: alignment.y,
+      targetFps: targetFps,
     );
 
     if (bindings == null) {
