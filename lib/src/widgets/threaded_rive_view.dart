@@ -141,7 +141,17 @@ class _ThreadedRiveViewState extends State<ThreadedRiveView>
         dt.inMicroseconds / Duration.microsecondsPerSecond;
 
     widget.controller.advance(elapsedSeconds);
-    setState(() {}); // trigger repaint to composite the latest GPU texture
+
+    // Mark the Texture's RenderObject needs paint so the next frame produces
+    // a fresh TextureLayer that samples the latest GPU texture content. A
+    // bare setState((){}) here is an identity-equal Texture rebuild —
+    // RenderTexture's props (textureId, freeze, filterQuality) don't change,
+    // so updateRenderObject is a no-op and the RenderObject stays clean.
+    // Without an explicit markNeedsPaint, Flutter's pipeline pacing parks
+    // vsync requests when nothing else is dirty and `vsync_p95` climbs to
+    // 50-140ms on idle Tier-1 Android. The findRenderObject call is cheap
+    // (one element walk) and only runs while the ticker is active.
+    context.findRenderObject()?.markNeedsPaint();
   }
 
   @override

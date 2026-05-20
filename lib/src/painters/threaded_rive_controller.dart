@@ -109,6 +109,22 @@ class ThreadedRiveController {
   /// Properties queued via [watchProperty] before [initialize] completes.
   final List<String> _pendingWatchProperties = [];
 
+  /// Writes (setEnum / setNumber / setBool / setString / fireTrigger) queued
+  /// before [initialize] completes. Each entry is a closure that applies the
+  /// queued write to the live bindings; the queue is drained once after
+  /// `_bindings` is set in [initialize]. Bounded to avoid unbounded growth
+  /// from a runaway upstream; overflow is dropped with a debug warning
+  /// (this is a watch-list for races, not a normal-traffic queue).
+  static const int _pendingWritesMaxQueueLength = 256;
+  final List<void Function(RiveThreadedBindings b)> _pendingWrites = [];
+  int _droppedPendingWrites = 0;
+
+  /// Public counter for diagnostics: number of writes dropped because the
+  /// pending-init queue was at [_pendingWritesMaxQueueLength] capacity. Stays
+  /// 0 in normal operation. Non-zero suggests an upstream is firing writes
+  /// faster than the threaded controller can initialize on this device.
+  int get droppedPendingWrites => _droppedPendingWrites;
+
   bool get isInitialized => _bindings != null;
 
   /// True after the native render callback has marked a fatal EGL/GL error
@@ -325,6 +341,17 @@ class ThreadedRiveController {
     }
     _pendingWatchProperties.clear();
 
+    // Replay writes that arrived during the async initialize window. The list
+    // preserves call order; each closure routes directly to the bindings so
+    // they land on the same code path as a post-init write. Cleared in-place
+    // so a subsequent dispose() doesn't double-replay.
+    if (_pendingWrites.isNotEmpty) {
+      for (final apply in _pendingWrites) {
+        apply(_bindings!);
+      }
+      _pendingWrites.clear();
+    }
+
     return true;
   }
 
@@ -371,21 +398,68 @@ class ThreadedRiveController {
 
   // ---------------------------------------------------------------------------
   // ViewModel inputs
+  //
+  // Each setter routes to the live bindings when initialized, otherwise queues
+  // a closure that replays the write on the bindings the moment `initialize`
+  // installs them. Without the queue, writes that arrive during the async
+  // `initialize` window (RenderTexture creation + RiveThreadedBindings.create
+  // round-trip — up to ~1s on Tier-1 Android) were silently swallowed by the
+  // `?.` short-circuit, leaving the SM in whatever state it started in.
   // ---------------------------------------------------------------------------
 
-  void setEnumProperty(String name, String value) =>
-      _bindings?.setEnumProperty(name, value);
+  void setEnumProperty(String name, String value) {
+    final b = _bindings;
+    if (b != null) {
+      b.setEnumProperty(name, value);
+    } else {
+      _queuePendingWrite((b) => b.setEnumProperty(name, value));
+    }
+  }
 
-  void setNumberProperty(String name, double value) =>
-      _bindings?.setNumberProperty(name, value);
+  void setNumberProperty(String name, double value) {
+    final b = _bindings;
+    if (b != null) {
+      b.setNumberProperty(name, value);
+    } else {
+      _queuePendingWrite((b) => b.setNumberProperty(name, value));
+    }
+  }
 
-  void setBoolProperty(String name, bool value) =>
-      _bindings?.setBoolProperty(name, value);
+  void setBoolProperty(String name, bool value) {
+    final b = _bindings;
+    if (b != null) {
+      b.setBoolProperty(name, value);
+    } else {
+      _queuePendingWrite((b) => b.setBoolProperty(name, value));
+    }
+  }
 
-  void setStringProperty(String name, String value) =>
-      _bindings?.setStringProperty(name, value);
+  void setStringProperty(String name, String value) {
+    final b = _bindings;
+    if (b != null) {
+      b.setStringProperty(name, value);
+    } else {
+      _queuePendingWrite((b) => b.setStringProperty(name, value));
+    }
+  }
 
-  void fireTriggerProperty(String name) => _bindings?.fireTrigger(name);
+  void fireTriggerProperty(String name) {
+    final b = _bindings;
+    if (b != null) {
+      b.fireTrigger(name);
+    } else {
+      _queuePendingWrite((b) => b.fireTrigger(name));
+    }
+  }
+
+  void _queuePendingWrite(void Function(RiveThreadedBindings b) apply) {
+    if (_isDisposed) return;
+    if (_pendingWrites.length >= _pendingWritesMaxQueueLength) {
+      _droppedPendingWrites++;
+      return;
+    }
+    _pendingWrites.add(apply);
+  }
 
   // ---------------------------------------------------------------------------
   // Snapshot / watch
