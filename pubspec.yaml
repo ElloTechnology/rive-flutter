@@ -26,3 +26,15 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+
+dependency_overrides:
+  rive_native:
+    git:
+      url: https://github.com/ElloTechnology/rive-native.git
+      # branch ello-2026-05-review at pin time. Must include both:
+      #   * fb02524 — force Dart_InitializeApiDL in profile/release builds
+      #     (without it, the worker's first Dart_PostInteger_DL jumps
+      #     through a null fn pointer and SIGSEGVs).
+      #   * abbe693 — self-paced bg loop + main-thread-safe scheduleFrame
+      #     wrapper (Patch E from the COR-3538 perf investigation).
+      ref: bc9e88457c35e4b93fc27f5981155f7161adf0bc
