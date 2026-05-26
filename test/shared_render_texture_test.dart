@@ -36,6 +36,9 @@ base class _FakeRenderTexture extends rive.RenderTexture {
   rive.Renderer get renderer => throw UnimplementedError();
 
   @override
+  dynamic get nativeRendererPtr => null;
+
+  @override
   bool clear(Color color, [bool write = true]) {
     clearCount++;
     lastClearColor = color;

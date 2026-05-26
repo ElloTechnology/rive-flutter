@@ -62,6 +62,7 @@ class ThreadedRiveController {
     required double devicePixelRatio,
     Fit fit = Fit.contain,
     Alignment alignment = Alignment.center,
+    double targetFps = 0.0,
   }) async =>
       false;
 

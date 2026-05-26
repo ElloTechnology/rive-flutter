@@ -61,6 +61,9 @@ base class _FakeRenderTexture extends rive.RenderTexture {
   rive.Renderer get renderer => recording;
 
   @override
+  dynamic get nativeRendererPtr => null;
+
+  @override
   int get textureId => -1;
   @override
   dynamic get nativeTexture => null;
