@@ -44,10 +44,14 @@ class _SharedTextureViewState extends State<SharedTextureView> {
 
   @override
   Widget build(BuildContext context) {
+    // Depend on MediaQuery's dpr so a runtime devicePixelRatio change (e.g.
+    // dragging the window to a different-DPI monitor) rebuilds this; View.of()
+    // only notifies on view-identity changes, not dpr changes.
+    MediaQuery.devicePixelRatioOf(context);
     return SharedTextureViewRenderer(
       renderTexturePainter: widget.painter,
       sharedTexture: widget.sharedTexture,
-      // Source the device pixel ratio from the view, not from MediaQuery, which
+      // Read the device pixel ratio from the view, not from MediaQuery, which
       // apps can override (UI scalers, device-preview shells). The shared-texture
       // canvas is sized by the real view dpr, so the painter transform must use
       // the same value, otherwise a painter offset within its panel is scaled by
