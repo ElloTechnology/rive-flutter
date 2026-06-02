@@ -1,6 +1,5 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:rive/src/widgets/inherited_widgets.dart';
 import 'package:rive_native/rive_native.dart';
 import 'package:meta/meta.dart';
@@ -48,7 +47,9 @@ class _SharedTextureViewState extends State<SharedTextureView> {
     return SharedTextureViewRenderer(
       renderTexturePainter: widget.painter,
       sharedTexture: widget.sharedTexture,
-      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+      // ENG-5361: use the real view dpr, not the overridable MediaQuery dpr,
+      // so the shared-texture transform matches the actual canvas resolution.
+      devicePixelRatio: View.of(context).devicePixelRatio,
       drawOrder: widget.drawOrder,
     );
   }
@@ -183,7 +184,6 @@ class SharedTextureViewRenderObject extends RiveNativeRenderBox
       return;
     }
     final panelRenderBox = panelKeyContext.findRenderObject() as RenderBox;
-    final dpr = devicePixelRatio;
 
     // Read the transform fresh every paint. The cached scale on
     // [RiveNativeRenderBox] (`desiredTransformWidth/HeightScale`) only
@@ -192,31 +192,12 @@ class SharedTextureViewRenderObject extends RiveNativeRenderBox
     // skip while still animating a Transform.scale — leaving the cached
     // scale stale while localToGlobal still tracks the live transform.
     //
-    // Native: getTransformTo(panelRenderBox) gives the painter->panel relative
-    // transform; any ancestor transform shared with the panel cancels out and
-    // the Texture widget re-applies it at composite time.
-    //
-    // Web: the shared texture is a platform view (HtmlElementView) that does
-    // NOT re-apply ancestor Flutter transforms (e.g. an ancestor FittedBox /
-    // Transform.scale) at composite time. Bake the full painter->screen
-    // transform into the draw coordinates instead, otherwise the artwork
-    // renders at window-relative coordinates under any ancestor transform.
-    final double scaleX, scaleY, translateX, translateY;
-    if (kIsWeb) {
-      final screen = getTransformTo(null).storage;
-      final panelPosition = panelRenderBox.localToGlobal(Offset.zero);
-      final globalPosition = localToGlobal(Offset.zero) - panelPosition;
-      scaleX = screen[0].abs();
-      scaleY = screen[5].abs();
-      translateX = globalPosition.dx;
-      translateY = globalPosition.dy;
-    } else {
-      final m = getTransformTo(panelRenderBox).storage;
-      scaleX = m[0].abs();
-      scaleY = m[5].abs();
-      translateX = m[12];
-      translateY = m[13];
-    }
+    // getTransformTo handles non-ancestor targets (panel is typically a
+    // sibling, not an ancestor) by walking both sides to the common
+    // ancestor and inverting. Any ancestor transform shared with the panel
+    // cancels out — the texture widget re-applies it at composite time.
+    final m = getTransformTo(panelRenderBox).storage;
+    final dpr = devicePixelRatio;
 
     // When dirty tracking is enabled, use accumulated elapsed time so the
     // controller receives the full wall-clock delta since the last advance.
@@ -227,10 +208,10 @@ class SharedTextureViewRenderObject extends RiveNativeRenderBox
     final renderer = texture.renderer;
     renderer.save();
     renderer.transform(Mat2D.fromScaleAndTranslation(
-      scaleX * dpr,
-      scaleY * dpr,
-      translateX * dpr,
-      translateY * dpr,
+      m[0].abs() * dpr,
+      m[5].abs() * dpr,
+      m[12] * dpr,
+      m[13] * dpr,
     ));
     _shouldAdvance = rivePainter?.paint(
           texture,

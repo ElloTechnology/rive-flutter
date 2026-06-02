@@ -1,5 +1,5 @@
 ## Ello patches
-- ENG-5361: Fix shared-texture rigs rendering at window-relative coordinates on Flutter **web** when under an ancestor transform (e.g. FittedBox / Transform.scale). Upstream b2ce130 (0.14.7) switched to a relative painter->panel transform that relies on the texture widget re-applying ancestor transforms at composite time; web platform-view textures (HtmlElementView) do not. Web now bakes the absolute painter->screen transform into the draw coords; native behaviour is unchanged.
+- ENG-5361: Fix shared-texture rigs rendering at the wrong position on Flutter web AND native when an ancestor `MediaQuery` overrides `devicePixelRatio` (device-preview shells, render-resolution scalers). Upstream b2ce130 (0.14.7) multiplies the panel-relative transform by `MediaQuery.devicePixelRatioOf(context)`, but the shared-texture canvas is sized by the real view dpr (`window.devicePixelRatio`). When they diverge and the painter is offset within its panel, the artwork is mispositioned. Fix: source the dpr from `View.of(context).devicePixelRatio` (the real, non-overridable view dpr) in `shared_texture_view.dart` and `rive_panel.dart`. Keeps upstream's relative `getTransformTo` transform (so its stale-cached-scale fix is preserved). Platform-agnostic; supersedes the earlier web-gated absolute-positioning patch.
 
 ## 0.14.7
 
