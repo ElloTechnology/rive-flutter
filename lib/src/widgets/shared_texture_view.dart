@@ -47,8 +47,11 @@ class _SharedTextureViewState extends State<SharedTextureView> {
     return SharedTextureViewRenderer(
       renderTexturePainter: widget.painter,
       sharedTexture: widget.sharedTexture,
-      // ENG-5361: use the real view dpr, not the overridable MediaQuery dpr,
-      // so the shared-texture transform matches the actual canvas resolution.
+      // Source the device pixel ratio from the view, not from MediaQuery, which
+      // apps can override (UI scalers, device-preview shells). The shared-texture
+      // canvas is sized by the real view dpr, so the painter transform must use
+      // the same value, otherwise a painter offset within its panel is scaled by
+      // the wrong factor and the artwork is mispositioned.
       devicePixelRatio: View.of(context).devicePixelRatio,
       drawOrder: widget.drawOrder,
     );

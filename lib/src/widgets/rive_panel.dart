@@ -176,7 +176,9 @@ class RiveSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dpr = View.of(context).devicePixelRatio; // ENG-5361: real view dpr
+    // Real view dpr, not MediaQuery's (which apps can override); must match the
+    // dpr the shared texture is sized/flushed at.
+    final dpr = View.of(context).devicePixelRatio;
     if (sharedTexture.devicePixelRatio != dpr) {
       sharedTexture.devicePixelRatio = dpr;
     }
