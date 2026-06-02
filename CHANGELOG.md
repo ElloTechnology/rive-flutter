@@ -1,3 +1,6 @@
+## Ello patches
+- ENG-5361: Fix shared-texture rigs rendering at window-relative coordinates on Flutter **web** when under an ancestor transform (e.g. FittedBox / Transform.scale). Upstream b2ce130 (0.14.7) switched to a relative painter->panel transform that relies on the texture widget re-applying ancestor transforms at composite time; web platform-view textures (HtmlElementView) do not. Web now bakes the absolute painter->screen transform into the draw coords; native behaviour is unchanged.
+
 ## 0.14.7
 
 - Bumps to `rive_native: 0.1.7`. Updates the Rive C++ runtime and renderer for the latest features, bug fixes, and performance improvements.
