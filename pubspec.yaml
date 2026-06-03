@@ -31,10 +31,9 @@ dependency_overrides:
   rive_native:
     git:
       url: https://github.com/ElloTechnology/rive-native.git
-      # branch ello-2026-05-review at pin time. Must include both:
-      #   * fb02524 — force Dart_InitializeApiDL in profile/release builds
-      #     (without it, the worker's first Dart_PostInteger_DL jumps
-      #     through a null fn pointer and SIGSEGVs).
-      #   * abbe693 — self-paced bg loop + main-thread-safe scheduleFrame
-      #     wrapper (Patch E from the COR-3538 perf investigation).
-      ref: bc9e88457c35e4b93fc27f5981155f7161adf0bc
+      # branch ello/main at pin time. Tracks the productionized rive_native fork
+      # tip the application consumes (forced Dart_InitializeApiDL in
+      # profile/release, the COR-3538 push-not-poll worker handshake, and the
+      # XP-1123 threaded Fit-frame decouple). Only affects this fork's standalone
+      # resolution — the application's own root override is what ships.
+      ref: 8f593300ceba1793878b07732c92adc6f0709b50
