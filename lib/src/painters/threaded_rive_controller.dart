@@ -248,6 +248,13 @@ class ThreadedRiveController {
   Future<bool> initialize({
     required int width,
     required int height,
+    // Physical-pixel extent of the artboard layout frame [fit] is computed
+    // against. `0` (default) fits against the full [width]x[height] texture
+    // box. Pass the layout-frame size (logical layout size × devicePixelRatio)
+    // when the texture is oversized for overdraw so the artboard renders at the
+    // same scale as the synchronous path instead of covering the whole texture.
+    int fitWidth = 0,
+    int fitHeight = 0,
     required double devicePixelRatio,
     Fit fit = Fit.contain,
     Alignment alignment = Alignment.center,
@@ -318,6 +325,8 @@ class ThreadedRiveController {
       viewModelInstance: vmiPtr,
       width: width,
       height: height,
+      fitWidth: fitWidth,
+      fitHeight: fitHeight,
       devicePixelRatio: devicePixelRatio,
       fit: fit.index,
       alignmentX: alignment.x,

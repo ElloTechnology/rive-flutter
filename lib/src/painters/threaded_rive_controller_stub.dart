@@ -59,6 +59,8 @@ class ThreadedRiveController {
   Future<bool> initialize({
     required int width,
     required int height,
+    int fitWidth = 0,
+    int fitHeight = 0,
     required double devicePixelRatio,
     Fit fit = Fit.contain,
     Alignment alignment = Alignment.center,

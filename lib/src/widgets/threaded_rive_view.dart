@@ -36,6 +36,7 @@ class ThreadedRiveView extends StatefulWidget {
     required this.controller,
     this.fit = Fit.contain,
     this.alignment = Alignment.center,
+    this.fitFrameSize,
     this.freeze = false,
     this.targetFps = 0.0,
   });
@@ -52,6 +53,17 @@ class ThreadedRiveView extends StatefulWidget {
   /// native [ThreadedScene] at initialize-time; changing this after
   /// [ThreadedRiveController.initialize] has no effect.
   final Alignment alignment;
+
+  /// Logical size of the artboard's layout frame — the box [fit] is computed
+  /// against. When `null`, the fit is computed against the full render texture
+  /// (the widget's measured bounds), so an oversized texture scales the
+  /// artboard up to cover it. Pass the layout-frame size (e.g. the character's
+  /// artboard frame) when the texture is intentionally larger than the artboard
+  /// for overdraw, so the artboard renders at the same scale it would at its
+  /// natural frame while still drawing past it into the surrounding texture.
+  /// Positioned within the texture by [alignment]. Read once at
+  /// [ThreadedRiveController.initialize] time; changes after init are ignored.
+  final Size? fitFrameSize;
 
   /// When true, Flutter will not request new frames from the texture even when
   /// the GPU content changes. Useful for pausing without disposing.
@@ -126,9 +138,18 @@ class _ThreadedRiveViewState extends State<ThreadedRiveView>
       return;
     }
 
+    // 0 = fit against the full texture box (native legacy behavior). A non-null
+    // fitFrameSize narrows the fit frame to the artboard's layout box so an
+    // oversized overdraw texture doesn't scale the artboard up to cover it.
+    final fitFrame = widget.fitFrameSize;
+    final fitWidth = fitFrame == null ? 0 : (fitFrame.width * dpr).round();
+    final fitHeight = fitFrame == null ? 0 : (fitFrame.height * dpr).round();
+
     final success = await widget.controller.initialize(
       width: w,
       height: h,
+      fitWidth: fitWidth,
+      fitHeight: fitHeight,
       devicePixelRatio: dpr,
       fit: widget.fit,
       alignment: widget.alignment,
