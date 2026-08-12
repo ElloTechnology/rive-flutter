@@ -1,5 +1,42 @@
 ## Upcoming
 
+### Deferred rendering
+
+The Rive Renderer (`Factory.rive`) now uses deferred rendering on native
+platforms, and it is the only native mode. Each frame is recorded on the UI
+thread as a compact command stream and replayed on a dedicated render
+thread, so GPU work no longer blocks the UI thread. Resources made with
+`Factory.rive` (paths, paints, images, text) are lightweight recording
+proxies that resolve during replay. Rendering behavior and output are
+unchanged for typical `RiveWidget`, `RivePanel`, and file-based usage; the
+changes below matter when migrating advanced integrations from 0.14.x.
+
+Migrating:
+
+- All Rive calls stay on the calling (UI) thread. The command stream has a
+  single writer per frame, so advancing or drawing from other threads is
+  not supported.
+- **Breaking**: removes `Rive.batchAdvance` and `Rive.batchAdvanceAndRender`
+  (and the native batch worker). Their worker threads recorded into the
+  command stream concurrently and corrupted it. Advance and draw each state
+  machine on the calling thread instead.
+- `RenderTexturePainter.riveFactory` names the factory the painted content
+  was made with, so the texture attaches its recording session (a
+  sessionless texture draws nothing on native). Defaults to `Factory.rive`;
+  override with the decoded file's `File.riveFactory` when content records
+  elsewhere (on web this opts single-file content into the per-file
+  session worker path), or with null when the session is managed manually.
+- Adds `SharedTexturePainter.riveFactory` (default `null`) for the same
+  reason on the `RivePanel` paint pass. Classes that
+  `implements SharedTexturePainter` must add the getter (`extends` inherits
+  the default).
+- One artboard instance per texture: showing the same artboard instance in
+  two `RiveWidget`s leaves the later one blank, with a debug message. Create
+  an artboard instance per widget.
+- `Factory.rive` on native resolves to the render context's recording
+  session. `file.riveFactory == Factory.rive` still holds, and resources
+  created directly on `Factory.rive` record and render correctly.
+
 ### Fixes
 
 - Corrected the minimum Flutter version to 3.32.0 (Dart 3.8.0). It was declared

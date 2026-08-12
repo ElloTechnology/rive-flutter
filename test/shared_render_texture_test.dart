@@ -84,6 +84,9 @@ class _FakePainter implements SharedTexturePainter {
   int framesToAdvance;
 
   @override
+  rive.Factory? get riveFactory => null;
+
+  @override
   int get sharedDrawOrder => drawOrder;
 
   @override

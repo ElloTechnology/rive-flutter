@@ -261,6 +261,11 @@ class SharedTextureViewRenderObject extends RiveNativeRenderBox
   @override
   int get sharedDrawOrder => drawOrder;
 
+  // Surfaced for the shared paint pass; this box's own render-box attach
+  // never runs (its texture is an [UnimplementedRenderTexture]).
+  @override
+  Factory? get riveFactory => rivePainter?.riveFactory;
+
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);

@@ -79,10 +79,7 @@ class Apple {
     required this.machine,
     required this.explode,
     required this.translation,
-  }) : bounds = artboard.bounds {
-    var center = bounds.center();
-    artboard.renderTransform = rive.Mat2D.fromTranslation(translation - center);
-  }
+  }) : bounds = artboard.bounds;
 
   void damage() {
     if (_isDead) {
@@ -93,8 +90,7 @@ class Apple {
   }
 
   void advance(double elapsedSeconds) {
-    // We don't advance the state machine here as we do all the apples in a
-    // single batch call.
+    machine.advanceAndApply(elapsedSeconds);
     if (_isDead) {
       _deadTime += elapsedSeconds;
     }
@@ -111,21 +107,6 @@ class Apple {
   void dispose() {
     artboard.dispose();
     machine.dispose();
-  }
-}
-
-class GhostApple {
-  final Apple apple;
-  rive.Vec2D translation;
-
-  GhostApple(this.apple, this.translation);
-
-  void draw(rive.Renderer renderer) {
-    renderer.save();
-    var center = apple.bounds.center();
-    renderer.translate(translation.x - center.x, translation.y - center.y);
-    apple.artboard.draw(renderer);
-    renderer.restore();
   }
 }
 
@@ -233,7 +214,6 @@ base class CentaurGame extends rive.RenderTexturePainter {
           bounds.minimum.x + range.x * rand.nextDouble(),
           bounds.minimum.y + range.y * rand.nextDouble(),
         ),
-        // translation: bounds.minimum,
       );
       _apples.add(apple);
       spawnCount++;
@@ -328,22 +308,8 @@ base class CentaurGame extends rive.RenderTexturePainter {
     }
     _arrows.removeAll(deadArrows);
 
-    bool batchRender = true;
-    // Advance apple state machines in one multi-threaded batch.
-    if (batchRender) {
-      rive.Rive.batchAdvanceAndRender(
-        _apples.map((apple) => apple.machine),
-        elapsedSeconds,
-        renderer,
-      );
-      // ignore: dead_code
-    } else {
-      rive.Rive.batchAdvance(
-        _apples.map((apple) => apple.machine),
-        elapsedSeconds,
-      );
-    }
-
+    // Advance and draw on the calling thread: the recording stream is
+    // single-writer.
     var deadApples = <Apple>{};
     for (final apple in _apples) {
       if (apple.isDead) {
@@ -352,10 +318,7 @@ base class CentaurGame extends rive.RenderTexturePainter {
         continue;
       }
       apple.advance(elapsedSeconds);
-      // ignore: dead_code
-      if (!batchRender) {
-        apple.draw(renderer);
-      }
+      apple.draw(renderer);
     }
     _apples.removeAll(deadApples);
     spawnApples(5);

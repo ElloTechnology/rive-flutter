@@ -1,9 +1,14 @@
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
+import 'package:rive_native/rive_deferred.dart' as rive_deferred;
 import 'package:rive_native/rive_native.dart' as rive;
 
 abstract class SharedTexturePainter {
   int get sharedDrawOrder;
+
+  /// The factory the painted content was made with, so the shared paint
+  /// pass can attach its recording session. Null when there is none.
+  rive.Factory? get riveFactory => null;
 
   /// Paint into the shared [texture] using [elapsedSeconds] since the last
   /// shared-texture frame. Return `true` if the painter wants the shared
@@ -142,6 +147,24 @@ class SharedRenderTexture {
     _ticker?.stop();
   }
 
+  /// Attach the painters' recording session - a sessionless texture draws
+  /// nothing on native. Runs every pass: the texture dedupes by session
+  /// address and drops that cache on recreation, so the re-attach is what
+  /// makes recreation self-healing.
+  void _ensureDeferredSession() {
+    for (final painter in painters) {
+      final factory = painter.riveFactory;
+      if (factory == null ||
+          !rive_deferred.deferredAutoAttach(factory) ||
+          // Bound sessions (web's per-file) cannot serve a shared texture.
+          rive_deferred.deferredBoundToOneTexture(factory)) {
+        continue;
+      }
+      texture.useDeferredSession(factory);
+      return;
+    }
+  }
+
   /// Paint the shared render texture.
   void _paintShared(double elapsedSeconds) {
     if (_disposed) return;
@@ -149,10 +172,27 @@ class SharedRenderTexture {
       // Nothing to draw — skip the clear/flush so a stale post-frame callback
       // (e.g. one queued before the last painter detached) cannot momentarily
       // blank the shared texture.
+      _pendingElapsed = 0;
       stopTicker();
       return;
     }
-    texture.clear(backgroundColor);
+    // Attach first: canAcceptDeferredFrame reads the attached session.
+    _ensureDeferredSession();
+    if (texture.deferredPaused || !texture.canAcceptDeferredFrame) {
+      // Nothing may record while paused or while the replay worker is behind
+      // (a recorded frame can never be dropped). Bank the time and retry.
+      _pendingElapsed += elapsedSeconds;
+      startTicker();
+      return;
+    }
+    if (!texture.clear(backgroundColor)) {
+      // A failed clear can be permanent (refused context, no session): stop
+      // rather than spin. Recreation repaints via the texture-changed
+      // listener.
+      _pendingElapsed += elapsedSeconds;
+      stopTicker();
+      return;
+    }
     bool anyShouldAdvance = false;
     for (final painter in painters) {
       if (painter.paintIntoSharedTexture(texture, elapsedSeconds)) {

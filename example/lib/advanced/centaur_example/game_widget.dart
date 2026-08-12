@@ -35,8 +35,9 @@ class _CentaurGameWidgetState extends State<CentaurGameWidget> {
 
   @override
   void dispose() {
-    super.dispose();
+    _renderTexture.dispose();
     _centaurPainter?.dispose();
+    super.dispose();
   }
 
   @override
