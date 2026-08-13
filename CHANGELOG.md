@@ -1,47 +1,28 @@
-## Upcoming
+## 0.15.0-dev.1
 
-### Deferred rendering
-
-The Rive Renderer (`Factory.rive`) now uses deferred rendering on native
-platforms, and it is the only native mode. Each frame is recorded on the UI
-thread as a compact command stream and replayed on a dedicated render
-thread, so GPU work no longer blocks the UI thread. Resources made with
-`Factory.rive` (paths, paints, images, text) are lightweight recording
-proxies that resolve during replay. Rendering behavior and output are
-unchanged for typical `RiveWidget`, `RivePanel`, and file-based usage; the
-changes below matter when migrating advanced integrations from 0.14.x.
-
-Migrating:
-
-- All Rive calls stay on the calling (UI) thread. The command stream has a
-  single writer per frame, so advancing or drawing from other threads is
-  not supported.
-- **Breaking**: removes `Rive.batchAdvance` and `Rive.batchAdvanceAndRender`
-  (and the native batch worker). Their worker threads recorded into the
-  command stream concurrently and corrupted it. Advance and draw each state
-  machine on the calling thread instead.
-- `RenderTexturePainter.riveFactory` names the factory the painted content
-  was made with, so the texture attaches its recording session (a
-  sessionless texture draws nothing on native). Defaults to `Factory.rive`;
-  override with the decoded file's `File.riveFactory` when content records
-  elsewhere (on web this opts single-file content into the per-file
-  session worker path), or with null when the session is managed manually.
-- Adds `SharedTexturePainter.riveFactory` (default `null`) for the same
-  reason on the `RivePanel` paint pass. Classes that
-  `implements SharedTexturePainter` must add the getter (`extends` inherits
-  the default).
-- One artboard instance per texture: showing the same artboard instance in
-  two `RiveWidget`s leaves the later one blank, with a debug message. Create
-  an artboard instance per widget.
-- `Factory.rive` on native resolves to the render context's recording
-  session. `file.riveFactory == Factory.rive` still holds, and resources
-  created directly on `Factory.rive` record and render correctly.
+- Bumps to `rive_native: 0.2.0-dev.1`. Updates the Rive C++ runtime and renderer for the latest features, bug fixes, and performance improvements.
+- GPU Canvas support at runtime, enabled through deferred rendering.
 
 ### Fixes
 
-- Corrected the minimum Flutter version to 3.32.0 (Dart 3.8.0). It was declared
-  as 3.28.0, so older Flutter versions resolved this package and then failed to
-  compile. See [#643](https://github.com/rive-app/rive-flutter/issues/643).
+- Resolved an Android performance regression caused by Flutter merging the UI and platform threads, which could block Flutter’s raster thread while Rive rendered. The new deferred renderer resolves this by recording frame N+1 (UI thread) while drawing frame N (separate rendering thread). Unblocking Flutter's UI and raster thread.
+- The new deferred renderer resolves OpenGL context corruption that could occur when Rive competed with other native rendering solutions, such as Mapbox.
+- Corrected the minimum Flutter version to 3.32.0 (Dart 3.8.0). It was declared as 3.28.0, so older Flutter versions resolved this package and then failed to compile. See [#643](https://github.com/rive-app/rive-flutter/issues/643).
+
+### Deferred rendering
+
+The Rive Renderer (`Factory.rive`) now uses deferred rendering on native platforms, and it is the only native mode. Each frame is recorded on the UI thread as a compact command stream and replayed on a dedicated render thread, so GPU work no longer blocks the UI thread. This results in substantial performance improvements, especially on Android where this new approach resolves a latent isue (see Fixes above).
+
+Resources made with `Factory.rive` (paths, paints, images, text) are lightweight recording proxies that resolve during replay. Rendering behavior and output are unchanged for typical `RiveWidget` / file-based usage; the changes below matter when migrating advanced integrations.
+
+Migrating:
+
+- All Rive calls stay on the calling (UI) thread. The command stream has a single writer per frame, so advancing or drawing from other threads is not supported.
+- **Breaking**: removes `Rive.batchAdvance` and `Rive.batchAdvanceAndRender` (and the native batch worker). Their worker threads recorded into the command stream concurrently and corrupted it. Advance and draw each state machine on the calling thread instead.
+- `RenderTexturePainter.riveFactory` names the factory the painted content was made with, so the texture attaches its recording session (a sessionless texture draws nothing on native). Defaults to `Factory.rive` override with the decoded file's `File.riveFactory` when content records elsewhere (on web this opts single-file content into the per-file session worker path), or with null when the session is managed manually.
+- One artboard instance per texture: showing the same artboard instance in two widgets leaves the later one blank, with a debug message. Create an artboard instance per widget.
+- `Factory.rive` on native resolves to the render context's recording session. `file.riveFactory == Factory.rive` still holds, and resources created directly on `Factory.rive` record and render correctly.
+- Advanced session control (manual attach/detach via `RenderTexture.useDeferredSession`, pacing, thread stats) is available through `package:rive_native/rive_deferred.dart`.
 
 ## 0.14.11
 
